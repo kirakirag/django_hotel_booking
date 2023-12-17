@@ -1,3 +1,4 @@
+from uuid import UUID
 from datetime import date
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
@@ -27,6 +28,12 @@ class BookingView(viewsets.ModelViewSet):
         """
         queryset: QuerySet = self.get_queryset()
         filter_kwargs = {'booking_number': self.kwargs['pk']}
+        # ensure pk is a valid UUID
+        try:
+            uuid = UUID(self.kwargs['pk'])
+        except ValueError as exc:
+            raise ValueError from exc
+
         # We return 404 if a user tries to access someone else's booking
         # to avoid revealing unnecessary info about the booking's existence
         # following the principle of least privilege here :)
