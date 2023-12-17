@@ -1,11 +1,13 @@
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework import generics, status
+from rest_framework import viewsets, generics, status
 from rest_framework.response import Response
+from rest_framework.decorators import action
+
 from .models import Booking, Room
 from .serializers import RoomSerializer, BookingSerializer
 
 
-class BookingView(generics.ListCreateAPIView):
+class BookingView(viewsets.ModelViewSet):
     """
     API view to create a new booking and list bookings of the authenticated user.
     """
@@ -33,6 +35,19 @@ class BookingView(generics.ListCreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         else:
             return Response({"error": "Room is not available for the selected dates."}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """
+        Cancel a booking.
+        """
+        booking = self.get_object()
+        if request.user == booking.user or request.user.is_superuser:
+            booking.status = 'cancelled'
+            booking.save()
+            return Response({'status': 'booking cancelled'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
 
 class RoomListView(generics.ListAPIView):

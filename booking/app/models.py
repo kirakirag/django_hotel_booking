@@ -19,8 +19,13 @@ class Room(models.Model):
     capacity: int = models.IntegerField()
 
     def is_available(self, start_date: date, end_date: date) -> bool:
+        """
+        Check if the room is available for booking between start_date and end_date.
+        Only considers active bookings.
+        """
         overlapping_bookings = Booking.objects.filter(
             room=self,
+            status='active',
             start_date__lt=end_date,
             end_date__gt=start_date
         )
@@ -36,7 +41,15 @@ class Booking(models.Model):
         room (ForeignKey): The Room that is booked.
         start_date (DateField): The start date of the booking.
         end_date (DateField): The end date of the booking.
+        status (CharField): Status of the booking: active or cancelled.
     """
+
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('cancelled', 'Cancelled')
+    ]
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default='active')
     booking_number = models.UUIDField(
         default=uuid.uuid4, editable=False, unique=True)
     user: User = models.ForeignKey(User, on_delete=models.CASCADE)
