@@ -21,9 +21,9 @@ class BookingView(viewsets.ModelViewSet):
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_object(self):
+    def get_object(self) -> Booking:
         """
-        Returns the object the view is displaying.
+        Returns the booking the view is displaying.
         Override to use `booking_number` instead of primary key `id`.
         """
         queryset: QuerySet = self.get_queryset()
@@ -65,15 +65,14 @@ class BookingView(viewsets.ModelViewSet):
 
         try:
             room: Room = Room.objects.get(pk=room_id)
-        except:
+        except Exception:
             return Response({"error": "Room not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if room.is_available(start_date, end_date) and start_date < end_date and start_date >= date.today():
             serializer.save(user=self.request.user)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        else:
-            return Response({"error": "Room is not available for the selected dates."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Room is not available for the selected dates."}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def cancel(self, request: Request, pk=None) -> Response:
@@ -102,12 +101,12 @@ class RoomListView(generics.ListAPIView):
         Returns:
             QuerySet: rooms filtered as requested
         """
-        queryset = Room.objects.all()
-        min_price = self.request.query_params.get('min_price')
-        max_price = self.request.query_params.get('max_price')
-        desired_capacity = self.request.query_params.get('capacity')
-        start_date_str = self.request.query_params.get('start_date')
-        end_date_str = self.request.query_params.get('end_date')
+        queryset: QuerySet = Room.objects.all()
+        min_price: float = self.request.query_params.get('min_price')
+        max_price: float = self.request.query_params.get('max_price')
+        desired_capacity: int = self.request.query_params.get('capacity')
+        start_date_str: str = self.request.query_params.get('start_date')
+        end_date_str: str = self.request.query_params.get('end_date')
 
         if min_price is not None:
             queryset = queryset.filter(price_per_night__gte=min_price)
