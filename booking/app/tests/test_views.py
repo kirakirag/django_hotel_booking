@@ -194,3 +194,59 @@ def test_booking_overlap():
     response = client.post(url, data)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db
+def test_cancel_booking():
+    """
+    Test cancellation of a booking.
+    """
+    client = APIClient()
+    user = User.objects.create_user(
+        username='cancel_testuser', password='12345')
+    client.force_authenticate(user=user)
+
+    room = Room.objects.create(
+        name="Room K", price_per_night=200.00, capacity=2)
+    booking = Booking.objects.create(user=user, room=room, start_date=date.today(
+    ), end_date=date.today() + timedelta(days=1))
+
+    url = reverse('booking-detail', args=[booking.id]) + 'cancel/'
+    response = client.post(url)
+
+    assert response.status_code == status.HTTP_200_OK
+    booking.refresh_from_db()
+    assert booking.status == 'cancelled'
+
+
+@pytest.mark.django_db
+def test_availability_after_cancellation(client):
+    """
+    Test that a room becomes available after a booking is cancelled.
+    """
+    client = APIClient()
+    user = User.objects.create_user(
+        username='cancel_testuser', password='12345')
+    client.force_authenticate(user=user)
+
+    room = Room.objects.create(
+        name="Test Room", price_per_night=200.00, capacity=2)
+    booking = Booking.objects.create(user=user, room=room, start_date=date.today(
+    ), end_date=date.today() + timedelta(days=1))
+
+    # Cancel the booking
+    cancel_url = reverse('booking-detail', args=[booking.id]) + 'cancel/'
+    cancel_response = client.post(cancel_url)
+    assert cancel_response.status_code == status.HTTP_200_OK
+
+    # Try to rebook the same room for the same dates
+    rebook_url = reverse('booking-list')
+    rebook_data = {
+        'room': room.id,
+        'start_date': date.today(),
+        'end_date': date.today() + timedelta(days=1)
+    }
+    rebook_response = client.post(rebook_url, rebook_data)
+
+    # The room should now be available, and the booking should succeed
+    assert rebook_response.status_code == status.HTTP_201_CREATED
