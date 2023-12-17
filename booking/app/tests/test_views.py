@@ -114,6 +114,15 @@ def test_invalid_date_range():
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    data = {
+        'room': room.id,
+        'start_date': date.today() - timedelta(1),
+        'end_date': date.today()
+    }
+    response = client.post(url, data)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
 
 @pytest.mark.django_db
 def test_room_filtering():
@@ -131,7 +140,7 @@ def test_room_filtering():
     response = client.get(url)
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1  # Expecting only one room with capacity 2
+    assert len(response.data) == 2  # Expecting two rooms with capacity >=2
     assert response.data[0]['capacity'] == 2
 
 
@@ -344,7 +353,7 @@ def test_user_can_view_their_bookings():
 
     assert response.status_code == status.HTTP_200_OK
     assert len(response.data) == 1
-    assert response.data[0]['room'] == room.id
+    assert response.data[0]['room_detail']['id'] == room.id
     assert response.data[0]['user'] == user.id
     assert response.data[0]['start_date'] == str(booking.start_date)
     assert response.data[0]['end_date'] == str(booking.end_date)
@@ -459,3 +468,106 @@ def test_superuser_can_cancel_any_booking(client: Client):
     booking.refresh_from_db()
     # Booking status should be updated to 'cancelled'
     assert booking.status == 'cancelled'
+
+
+@pytest.mark.django_db
+def test_create_booking_with_large_date():
+    client = APIClient()
+    user = CustomUser.objects.create_user(
+        email='testuser@example.com', password='password')
+    client.force_authenticate(user=user)
+    room = Room.objects.create(
+        name="Test Room", price_per_night=100, capacity=2)
+
+    large_date = "9" * 10**6 + "-12-31"
+    response = client.post(reverse('booking-list'), {
+        'room': room.id,
+        'start_date': large_date,
+        'end_date': large_date
+    })
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_create_booking_with_incorrect_date():
+    client = APIClient()
+    user = CustomUser.objects.create_user(
+        email='testuser@example.com', password='password')
+    client.force_authenticate(user=user)
+    room = Room.objects.create(
+        name="Test Room", price_per_night=100, capacity=2)
+
+    incorrect_date = "date"
+    response = client.post(reverse('booking-list'), {
+        'room': room.id,
+        'start_date': incorrect_date,
+        'end_date': incorrect_date
+    })
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_room_list_normal():
+    client = APIClient()
+    url = reverse('room-list')
+
+    # Create rooms
+    Room.objects.create(name="Standard Room", price_per_night=100, capacity=2)
+    Room.objects.create(name="Deluxe Room", price_per_night=200, capacity=3)
+
+    # Testing with normal parameters
+    response = client.get(
+        url, {'min_price': 50, 'max_price': 100, 'capacity': 2})
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data) == 1
+
+
+@pytest.mark.django_db
+def test_room_list_booked():
+    client = APIClient()
+    url = reverse('room-list')
+    start_date = date.today().strftime("%Y-%m-%d")
+    end_date = (date.today() + timedelta(1)).strftime("%Y-%m-%d")
+
+    # Create user
+    user = CustomUser.objects.create_user(
+        email='testuser@example.com', password='password')
+
+    # Create rooms
+    room1 = Room.objects.create(
+        name="Standard Room", price_per_night=100, capacity=2)
+    room2 = Room.objects.create(
+        name="Deluxe Room", price_per_night=200, capacity=3)
+
+    # Book room
+    Booking.objects.create(
+        user=user,
+        room=room1,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=1)
+    )
+
+    response = client.get(
+        url, {'min_price': 50, 'max_price': 250, 'capacity': 2, 'start_date': start_date, 'end_date': end_date})
+
+    assert response.status_code == status.HTTP_200_OK
+    # Only one room should match
+    assert len(response.data) == 1
+
+    # Book second room
+    Booking.objects.create(
+        user=user,
+        room=room2,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=1)
+    )
+
+    response = client.get(
+        url, {'min_price': 50, 'max_price': 250, 'capacity': 2, 'start_date': start_date, 'end_date': end_date})
+
+    assert response.status_code == status.HTTP_200_OK
+    # No rooms should match
+    assert len(response.data) == 0

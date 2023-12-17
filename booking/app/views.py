@@ -1,5 +1,5 @@
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 # from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.db.models import QuerySet
@@ -49,7 +49,7 @@ class BookingView(viewsets.ModelViewSet):
         """
         if self.request.user.is_superuser:
             return Booking.objects.all()
-        return Booking.objects.filter(user=self.request.user)
+        return Booking.objects.filter(user=self.request.user, status="active")
 
     def create(self, request, *args, **kwargs) -> Response:
         """
@@ -58,11 +58,15 @@ class BookingView(viewsets.ModelViewSet):
         serializer: BookingSerializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        room_id: str = serializer.validated_data.get('room').id
+        # Get the room_id directly from the request data
+        room_id: str = request.data.get('room')
         start_date: date = serializer.validated_data.get('start_date')
         end_date: date = serializer.validated_data.get('end_date')
 
-        room: Room = Room.objects.get(pk=room_id)
+        try:
+            room: Room = Room.objects.get(pk=room_id)
+        except:
+            return Response({"error": "Room not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if room.is_available(start_date, end_date) and start_date < end_date and start_date >= date.today():
             serializer.save(user=self.request.user)
@@ -87,9 +91,8 @@ class BookingView(viewsets.ModelViewSet):
 
 class RoomListView(generics.ListAPIView):
     """
-    API view to list and filter rooms based on price and capacity.
+    API view to list and filter rooms based on price, capacity, and availability.
     """
-    queryset: QuerySet = Room.objects.all()
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
@@ -99,18 +102,31 @@ class RoomListView(generics.ListAPIView):
         Returns:
             QuerySet: rooms filtered as requested
         """
-        queryset: QuerySet = Room.objects.all()
-        min_price: float = self.request.query_params.get('min_price')
-        max_price: float = self.request.query_params.get('max_price')
-        capacity: int = self.request.query_params.get('capacity')
+        queryset = Room.objects.all()
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        desired_capacity = self.request.query_params.get('capacity')
+        start_date_str = self.request.query_params.get('start_date')
+        end_date_str = self.request.query_params.get('end_date')
 
         if min_price is not None:
             queryset = queryset.filter(price_per_night__gte=min_price)
         if max_price is not None:
             queryset = queryset.filter(price_per_night__lte=max_price)
-        if capacity is not None:
-            queryset = queryset.filter(capacity=capacity)
+        if desired_capacity is not None:
+            queryset = queryset.filter(capacity__gte=desired_capacity)
 
+        try:
+            start_date = datetime.strptime(
+                start_date_str, '%Y-%m-%d').date() if start_date_str else None
+            end_date = datetime.strptime(
+                end_date_str, '%Y-%m-%d').date() if end_date_str else None
+        except ValueError:
+            return queryset
+
+        if start_date and end_date:
+            queryset = [room for room in queryset if room.is_available(
+                start_date, end_date)]
         return queryset
 
 
