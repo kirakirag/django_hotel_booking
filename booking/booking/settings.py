@@ -17,6 +17,14 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Hotel Booking API',
+    'DESCRIPTION': 'A hotel booking API',
+    'VERSION': '0.0.1',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 SIMPLE_JWT = {
@@ -60,6 +68,7 @@ INSTALLED_APPS = [
     "app",
     "rest_framework",
     "corsheaders",
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [

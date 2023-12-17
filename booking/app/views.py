@@ -10,8 +10,14 @@ from rest_framework.request import Request
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample
+
 from .models import Booking, Room, CustomUser
 from .serializers import RoomSerializer, BookingSerializer, UserSerializer
+from .schema_serializers import (UserCreatedResponseSerializer,
+                                 BookingCreateRequestSerializer,
+                                 BookingCancelResponseSerializer,
+                                 BookingFailedCreateResponseSerializer)
 
 
 class BookingView(viewsets.ModelViewSet):
@@ -29,10 +35,10 @@ class BookingView(viewsets.ModelViewSet):
         queryset: QuerySet = self.get_queryset()
         filter_kwargs = {'booking_number': self.kwargs['pk']}
         # ensure pk is a valid UUID
-        try:
-            uuid = UUID(self.kwargs['pk'])
-        except ValueError as exc:
-            raise ValueError from exc
+        # try:
+        #     uuid = UUID(self.kwargs['pk'])
+        # except ValueError as exc:
+        #     raise ValueError from exc
 
         # We return 404 if a user tries to access someone else's booking
         # to avoid revealing unnecessary info about the booking's existence
@@ -51,6 +57,41 @@ class BookingView(viewsets.ModelViewSet):
             return Booking.objects.all()
         return Booking.objects.filter(user=self.request.user, status="active")
 
+    @extend_schema(
+        request=BookingCreateRequestSerializer,
+        responses={201: BookingSerializer,
+                   400: BookingFailedCreateResponseSerializer},
+        parameters=[
+            OpenApiParameter(
+                name="Authorization",
+                description="Bearer Token for authorization",
+                required=True,
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER
+            )
+        ],
+        examples=[
+            OpenApiExample(
+                "Create Booking Example",
+                summary="Example of a booking creation request",
+                value={
+                    "room": 1,
+                    "start_date": "2023-01-01",
+                    "end_date": "2023-01-03"
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Unsuccessful Create Booking Example",
+                summary="Booking failed",
+                value={
+                    "error": "Room is not available for the selected dates."
+                },
+                response_only=True,
+                status_codes=[400]
+            )
+        ]
+    )
     def create(self, request, *args, **kwargs) -> Response:
         """
         Create a booking if the room is available.
@@ -74,6 +115,29 @@ class BookingView(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         return Response({"error": "Room is not available for the selected dates."}, status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        responses={
+            200: BookingCancelResponseSerializer,
+            404: OpenApiTypes.OBJECT
+        },
+        parameters=[],
+        examples=[
+            OpenApiExample(
+                'Booking Cancelled Example',
+                summary='Booking successfully cancelled',
+                response_only=True,
+                status_codes=['200'],
+                value={'status': 'booking cancelled'}
+            ),
+            OpenApiExample(
+                'Booking Cancel Unauthorized Example',
+                summary='Unauthorized cancellation attempt or booking does not exist',
+                response_only=True,
+                status_codes=['404'],
+                value={'status': 'Not Found'}
+            )
+        ]
+    )
     @action(detail=True, methods=['post'])
     def cancel(self, request: Request, pk=None) -> Response:
         """
@@ -85,7 +149,7 @@ class BookingView(viewsets.ModelViewSet):
             booking.save()
             return Response({'status': 'booking cancelled'}, status=status.HTTP_200_OK)
 
-        return Response({'status': 'unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'status': 'Not Found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class RoomListView(generics.ListAPIView):
@@ -94,6 +158,24 @@ class RoomListView(generics.ListAPIView):
     """
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("min_price", OpenApiTypes.FLOAT,
+                             OpenApiParameter.QUERY),
+            OpenApiParameter("max_price", OpenApiTypes.FLOAT,
+                             OpenApiParameter.QUERY),
+            OpenApiParameter("capacity", OpenApiTypes.INT,
+                             OpenApiParameter.QUERY),
+            OpenApiParameter("start_date", OpenApiTypes.DATE,
+                             OpenApiParameter.QUERY),
+            OpenApiParameter("end_date", OpenApiTypes.DATE,
+                             OpenApiParameter.QUERY)
+        ],
+        responses={200: RoomSerializer(many=True)}
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self) -> QuerySet:
         """Return a QuerySet of filtered rooms.
@@ -134,15 +216,38 @@ class CreateUserView(views.APIView):
     A view that handles user sign-up.
     """
     permission_classes = [AllowAny]
+    serializer_class = UserSerializer
 
+    @extend_schema(
+        request=UserSerializer,
+        responses={
+            201: UserCreatedResponseSerializer,
+            400: OpenApiTypes.OBJECT
+        },
+        examples=[
+            OpenApiExample(
+                'User Created Example',
+                summary='User created successfully',
+                response_only=True,
+                status_codes=['201'],
+                value={'message': 'User created successfully'}
+            ), OpenApiExample(
+                'User Not Created Example',
+                summary='User was not created',
+                response_only=True,
+                status_codes=['400'],
+                value={'message': 'custom user with this email already exists'}
+            )
+        ]
+    )
     def post(self, request: Request) -> Response:
-        """Handle post requests.
+        """Register a new user.
 
         Args:
-            request (Request): request to the API 
+            request (Request): new user data 
 
         Returns:
-            Response: API's response
+            Response: HTTP status 201 if successful, status 400 otherwise
         """
         serializer: UserSerializer = UserSerializer(data=request.data)
         if serializer.is_valid():
