@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Room, Booking
+from .models import Room, Booking, CustomUser
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -35,9 +35,27 @@ class BookingSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     """
-    Serializer for User.
+    Serializer for the CustomUser model.
     """
+
     class Meta:
-        model = User
-        fields = ['username', 'password', 'email']
-        extra_kwargs = {'password': {'write_only': True}}
+        model = CustomUser
+        fields = ('email', 'password')
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+
+    def create(self, validated_data):
+        # Use create_user method to handle password hashing
+        return CustomUser.objects.create_user(**validated_data)
+
+    def update(self, instance, validated_data):
+        # Update user info, handling password hashing if password is provided
+        password = validated_data.pop('password', None)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance

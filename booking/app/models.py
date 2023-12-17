@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from datetime import date
-from django.contrib.auth.models import User, AbstractUser
 
 
 class Room(models.Model):
@@ -25,11 +25,47 @@ class Room(models.Model):
         """
         overlapping_bookings = Booking.objects.filter(
             room=self,
-            status='active',
+            status="active",
             start_date__lt=end_date,
             end_date__gt=start_date
         )
         return not overlapping_bookings.exists()
+
+
+class CustomUserManager(BaseUserManager):
+    """
+    Custom user manager where email is the unique identifier
+    for authentication.
+    """
+
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email must be set')
+        email: str = self.normalize_email(email)
+        user: CustomUser = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        return self.create_user(email, password, **extra_fields)
+
+
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    """
+    Custom user class that uses email as the primary identifier
+    """
+    email: models.EmailField = models.EmailField('email address', unique=True)
+    is_staff: models.BooleanField = models.BooleanField(default=False)
+    is_active: models.BooleanField = models.BooleanField(default=True)
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
 
 
 class Booking(models.Model):
@@ -45,27 +81,14 @@ class Booking(models.Model):
     """
 
     STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('cancelled', 'Cancelled')
+        ("active", "Active"),
+        ("cancelled", "Cancelled")
     ]
     status = models.CharField(
-        max_length=10, choices=STATUS_CHOICES, default='active')
+        max_length=10, choices=STATUS_CHOICES, default="active")
     booking_number = models.UUIDField(
         default=uuid.uuid4, editable=False, unique=True)
-    user: User = models.ForeignKey(User, on_delete=models.CASCADE)
+    user: CustomUser = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     room: Room = models.ForeignKey(Room, on_delete=models.CASCADE)
     start_date: date = models.DateField()
     end_date: date = models.DateField()
-
-
-# TODO use email as username
-# class CustomUser(AbstractUser):
-#     username = None
-#     email = models.EmailField(
-#         'email address', unique=True)
-
-#     USERNAME_FIELD = 'email'
-#     REQUIRED_FIELDS = []
-
-#     def __str__(self):
-#         return self.email

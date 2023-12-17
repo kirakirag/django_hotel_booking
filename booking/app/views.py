@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import date
-from django.contrib.auth.models import User
+# from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.db.models import QuerySet
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, AllowAny, IsAuthenticated
@@ -10,7 +10,7 @@ from rest_framework.request import Request
 from rest_framework.decorators import action
 from rest_framework.views import APIView
 
-from .models import Booking, Room
+from .models import Booking, Room, CustomUser
 from .serializers import RoomSerializer, BookingSerializer, UserSerializer
 
 
@@ -64,7 +64,7 @@ class BookingView(viewsets.ModelViewSet):
 
         room: Room = Room.objects.get(pk=room_id)
 
-        if room.is_available(start_date, end_date) and start_date < end_date:
+        if room.is_available(start_date, end_date) and start_date < end_date and start_date >= date.today():
             serializer.save(user=self.request.user)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -131,7 +131,7 @@ class CreateUserView(views.APIView):
         """
         serializer: UserSerializer = UserSerializer(data=request.data)
         if serializer.is_valid():
-            User.objects.create_user(**serializer.validated_data)
+            CustomUser.objects.create_user(**serializer.validated_data)
             return Response({"message": "User created successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

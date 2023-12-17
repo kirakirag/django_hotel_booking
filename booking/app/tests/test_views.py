@@ -1,8 +1,7 @@
 from django.test.client import Client
 import pytest
-from django.contrib.auth.models import User
 from datetime import date, timedelta
-from app.models import Booking
+from app.models import Booking, CustomUser
 
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -36,8 +35,8 @@ def test_create_booking():
     client = APIClient()
 
     # Create a user and authenticate
-    user: User = User.objects.create_user(
-        username='testuser', password='12345')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
     client.force_authenticate(user=user)
 
     # Create a room
@@ -63,8 +62,8 @@ def test_room_unavailability():
     client = APIClient()
 
     # Create a user and authenticate
-    user: User = User.objects.create_user(
-        username='unavailable_testuser', password='12345')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
     client.force_authenticate(user=user)
 
     # Create a room and an overlapping booking
@@ -97,8 +96,8 @@ def test_invalid_date_range():
     client = APIClient()
 
     # Create a user and authenticate
-    user: User = User.objects.create_user(
-        username='date_testuser', password='12345')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
     client.force_authenticate(user=user)
 
     # Create a room
@@ -144,8 +143,10 @@ def test_user_specific_booking_list():
     client = APIClient()
 
     # Create two users
-    user1: User = User.objects.create_user(username='user1', password='12345')
-    user2: User = User.objects.create_user(username='user2', password='54321')
+    user1: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
+    user2: CustomUser = CustomUser.objects.create_user(
+        email='testuser1@example.com', password='54321')
 
     # Create a room
     room: Room = Room.objects.create(
@@ -163,7 +164,7 @@ def test_user_specific_booking_list():
     response = client.get(url)
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data) == 1  # User1 should only see their booking
+    assert len(response.data) == 1  # CustomUser1 should only see their booking
     assert response.data[0]['user'] == user1.id
 
 
@@ -175,8 +176,8 @@ def test_booking_overlap():
     client = APIClient()
 
     # Create a user and authenticate
-    user: User = User.objects.create_user(
-        username='overlap_testuser', password='12345')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
     client.force_authenticate(user=user)
 
     # Create a room
@@ -205,8 +206,8 @@ def test_cancel_booking():
     Test cancellation of a booking.
     """
     client = APIClient()
-    user = User.objects.create_user(
-        username='cancel_testuser', password='12345')
+    user = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
     client.force_authenticate(user=user)
 
     room: Room = Room.objects.create(
@@ -228,8 +229,8 @@ def test_availability_after_cancellation(client: Client):
     Test that a room becomes available after a booking is cancelled.
     """
     client = APIClient()
-    user: User = User.objects.create_user(
-        username='cancel_testuser', password='12345')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='12345')
     client.force_authenticate(user=user)
 
     room: Room = Room.objects.create(
@@ -264,9 +265,8 @@ def test_user_registration():
     client = APIClient()
     url = reverse('register')
     data = {
-        'username': 'testuser',
+        'email': 'testuser@example.com',
         'password': 'testpass123',
-        'email': 'testuser@example.com'
     }
     response = client.post(url, data)
 
@@ -282,15 +282,14 @@ def test_jwt_token_generation():
     client = APIClient()
     # First, register a new user
     client.post(reverse('register'), {
-        'username': 'jwtuser',
+        'email': 'testuser@example.com',
         'password': 'jwtpass123',
-        'email': 'jwtuser@example.com'
     })
 
     # Now, obtain a JWT token for the registered user
     url = reverse('token_obtain_pair')
     response = client.post(
-        url, {'username': 'jwtuser', 'password': 'jwtpass123'})
+        url, {'email': 'testuser@example.com', 'password': 'jwtpass123'})
 
     assert response.status_code == status.HTTP_200_OK
     assert 'access' in response.data
@@ -309,12 +308,11 @@ def test_protected_endpoint_access():
 
     # Register and obtain a token
     client.post(reverse('register'), {
-        'username': 'secureuser',
+        'email': 'testuser@example.com',
         'password': 'securepass123',
-        'email': 'secureuser@example.com'
     })
     token_response = client.post(reverse('token_obtain_pair'), {
-                                 'username': 'secureuser', 'password': 'securepass123'})
+                                 'email': 'testuser@example.com', 'password': 'securepass123'})
     token = token_response.data['access']
 
     # Attempt to access protected endpoint with the token
@@ -326,10 +324,10 @@ def test_protected_endpoint_access():
 @pytest.mark.django_db
 def test_user_can_view_their_bookings():
     client = APIClient()
-    user: User = User.objects.create_user(
-        username='viewuser', password='viewpass')
-    user1: User = User.objects.create_user(
-        username='viewuser1', password='viewpass')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='viewpass')
+    user1: CustomUser = CustomUser.objects.create_user(
+        email='testuser1@example.com', password='viewpass')
     client.force_authenticate(user=user)
 
     room = Room.objects.create(
@@ -355,8 +353,8 @@ def test_user_can_view_their_bookings():
 @pytest.mark.django_db
 def test_user_can_cancel_booking():
     client = APIClient()
-    user: User = User.objects.create_user(
-        username='canceluser', password='cancelpass')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='cancelpass')
     client.force_authenticate(user=user)
 
     room: Room = Room.objects.create(
@@ -379,48 +377,48 @@ def test_user_cannot_cancel_others_booking():
     """
     client = APIClient()
     # Create two users
-    user1: User = User.objects.create_user(
-        username='user1', password='user1pass')
-    user2: User = User.objects.create_user(
-        username='user2', password='user2pass')
+    user1: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='user1pass')
+    user2: CustomUser = CustomUser.objects.create_user(
+        email='testuser1@example.com', password='user2pass')
 
-    # User1 creates a booking
+    # CustomUser1 creates a booking
     room: Room = Room.objects.create(
         name="Shared Room", price_per_night=200.00, capacity=3)
     booking: Booking = Booking.objects.create(user=user1, room=room, start_date=date.today(
     ), end_date=date.today() + timedelta(days=1))
 
-    # User2 tries to cancel User1's booking
+    # CustomUser2 tries to cancel CustomUser1's booking
     client.force_authenticate(user=user2)
     cancel_url = reverse(
         'booking-detail', args=[booking.booking_number]) + 'cancel/'
     response = client.post(cancel_url)
 
-    # User2 should receive a 403 Forbidden response
+    # CustomUser2 should receive a 403 Forbidden response
     assert response.status_code == status.HTTP_404_NOT_FOUND
     client.force_authenticate(user=user1)
     response = client.post(cancel_url)
 
-    # User1 should be able to cancel the booking
+    # CustomUser1 should be able to cancel the booking
     assert response.status_code == status.HTTP_200_OK
     booking.refresh_from_db()
     assert booking.status == 'cancelled'
 
 
 @pytest.mark.django_db
-def test_superuser_can_view_all_bookings(client):
+def test_superuser_can_view_all_bookings(client: Client):
     """
     Test that a superuser can view all bookings.
     """
     client = APIClient()
-    superuser: User = User.objects.create_superuser(
-        username='admin', password='admin')
+    superuser: CustomUser = CustomUser.objects.create_superuser(
+        email='admin', password='admin')
     client.force_authenticate(user=superuser)
 
-    user1: User = User.objects.create_user(
-        username='user1', password='user1pass')
-    user2: User = User.objects.create_user(
-        username='user2', password='user2pass')
+    user1: CustomUser = CustomUser.objects.create_user(
+        email='testuser@example.com', password='user1pass')
+    user2: CustomUser = CustomUser.objects.create_user(
+        email='testuser1@example.com', password='user2pass')
 
     room: Room = Room.objects.create(
         name="Superuser Room", price_per_night=300.00, capacity=4)
@@ -437,16 +435,17 @@ def test_superuser_can_view_all_bookings(client):
 
 
 @pytest.mark.django_db
-def test_superuser_can_cancel_any_booking(client):
+def test_superuser_can_cancel_any_booking(client: Client):
     """
     Test that a superuser can cancel any user's booking.
     """
     client = APIClient()
-    superuser: User = User.objects.create_superuser(
-        username='admin', password='admin')
+    superuser: CustomUser = CustomUser.objects.create_superuser(
+        email='testuser@example.com', password='admin')
     client.force_authenticate(user=superuser)
 
-    user: User = User.objects.create_user(username='user', password='userpass')
+    user: CustomUser = CustomUser.objects.create_user(
+        email='testuser1@example.com', password='userpass')
     room: Room = Room.objects.create(
         name="Cancellable Room", price_per_night=200.00, capacity=2)
     booking: Booking = Booking.objects.create(user=user, room=room, start_date=date.today(
