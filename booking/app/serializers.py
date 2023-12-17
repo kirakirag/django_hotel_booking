@@ -18,10 +18,13 @@ class BookingSerializer(serializers.ModelSerializer):
     Serializer for the Booking model.
     """
     user = serializers.PrimaryKeyRelatedField(read_only=True)
+    room = serializers.PrimaryKeyRelatedField(
+        queryset=Room.objects.all(), write_only=True)
+    room_detail = RoomSerializer(source='room', read_only=True)
 
     class Meta:
         model = Booking
-        fields = ['booking_number', 'user', 'room',
+        fields = ['booking_number', 'user', 'room', 'room_detail',
                   'start_date', 'end_date', 'status']
 
     def to_representation(self, instance):
