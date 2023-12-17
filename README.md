@@ -31,34 +31,17 @@ git clone https://github.com/kirakirag/django_hotel_booking.git
 cd hotel-booking-api
 ```
 
-2. Create virtual environment and install dependencies:
+2. Launch the app in Docker:
 ```
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+docker-compose build && docker-compose up
 ```
 
-3. Run a postgres instance in docker:
+3. Create a superuser account:
 ```
-docker run --name some-postgres -e POSTGRES_PASSWORD=mysecretpassword -d -p 5432:5432 postgres
-```
-
-4. Run database migrations:
-```
-cd booking && python manage.py makemigrations && python manage.py migrate
+docker-compose run web python booking/manage.py createsuperuser
 ```
 
-5. Create a superuser account:
-```
-python manage.py createsuperuser
-```
-
-6. Start the development server and open http://localhost:8000
-```
-python manage.py runserver
-```
-
-7. (Optional) Use my [simple Vue front-end](https://github.com/kirakirag/vue_hotel_booking) to interact with the app
+4. (Optional) Use my [simple Vue front-end](https://github.com/kirakirag/vue_hotel_booking) to interact with the app
 
 ## API Documentation
 
