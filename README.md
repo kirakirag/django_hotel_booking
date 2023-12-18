@@ -43,6 +43,14 @@ docker-compose run web python booking/manage.py createsuperuser
 
 4. (Optional) Use my [simple Vue front-end](https://github.com/kirakirag/vue_hotel_booking) to interact with the app
 
+## Testing
+
+This app uses automatic testing with pytest. To view and modify the tests:
+Go to ```booking/tests```
+
+To run tests:
+```docker-compose run web pytest booking```
+
 ## API Documentation
 
 To view the auto-generated API documentation:
