@@ -106,10 +106,10 @@ class BookingView(viewsets.ModelViewSet):
 
         try:
             room: Room = Room.objects.get(pk=room_id)
-        except Exception:
-            return Response({"error": "Room not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            return Response({"error": "Room not found."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if room.is_available(start_date, end_date) and start_date < end_date and start_date >= date.today():
+        if start_date < end_date and start_date >= date.today() and room.is_available(start_date, end_date):
             serializer.save(user=self.request.user)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

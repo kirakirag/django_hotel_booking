@@ -6,3 +6,4 @@ django-filter
 pytest-django
 psycopg
 drf-spectacular
+hypothesis
